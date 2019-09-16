@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/gocolly/colly"
+	"github.com/gocolly/colly/extensions"
 )
 
 type page struct {
@@ -13,22 +14,25 @@ type page struct {
 	items []item
 }
 
-func createPage(no int, pageURL string) *page {
+func createPage(wg *sync.WaitGroup, no int, pageURL string) *page {
 	c := colly.NewCollector()
+	extensions.RandomUserAgent(c)
 	items := make([]item, 0)
 
 	// big playing area
 	c.OnHTML(`div[class="podcasts container"]`, func(e *colly.HTMLElement) {
 		item := createItemFromBig(e)
-		go item.downloadTranscript()
 		items = append(items, *item)
+		wg.Add(1)
+		go item.downloadTranscript(wg)
 	})
 
 	// grid item
 	c.OnHTML(`div[class="grid__col large-1-2 xlarge-1-2 medium-1-2 small-no-pad"]`, func(e *colly.HTMLElement) {
 		item := createItemFromGrid(e)
-		go item.downloadTranscript()
 		items = append(items, *item)
+		wg.Add(1)
+		go item.downloadTranscript(wg)
 	})
 
 	c.Visit(pageURL)
@@ -49,8 +53,10 @@ func (it *item) downloadMp3() {
 
 }
 
-func (it *item) downloadTranscript() {
+func (it *item) downloadTranscript(wg *sync.WaitGroup) {
+	defer wg.Done()
 	c := colly.NewCollector()
+	extensions.RandomUserAgent(c)
 
 	// full transcript
 	c.OnHTML(`div[id="transcripts-body"]`, func(e *colly.HTMLElement) {
@@ -92,15 +98,20 @@ func main() {
 	waitGroup := sync.WaitGroup{}
 
 	start := time.Now()
-	for ; pageNo < 3; pageNo++ {
+	for ; pageNo < 2; pageNo++ {
 		waitGroup.Add(1)
 		go func(pageNo int) {
-			page := createPage(pageNo, fmt.Sprintf("https://www.scientificamerican.com/podcast/60-second-science/?page=%d", pageNo))
+			defer waitGroup.Done()
+			page := createPage(&waitGroup, pageNo, fmt.Sprintf("https://www.scientificamerican.com/podcast/60-second-science/?page=%d", pageNo))
 			pages = append(pages, *page)
-			waitGroup.Done()
 		}(pageNo)
 	}
 	waitGroup.Wait()
 	end := time.Now()
-	fmt.Printf("totally used %d s", end.Sub(start)/time.Second)
+	fmt.Printf("totally used %d s\n", end.Sub(start)/time.Second)
+	for _, page := range pages {
+		for _, item := range page.items {
+			println(item.transcript)
+		}
+	}
 }
