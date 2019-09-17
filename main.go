@@ -1,10 +1,12 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -132,12 +134,22 @@ func createItemFromGrid(e *colly.HTMLElement) *item {
 }
 
 func main() {
+	count := 2
+	flag.Parse()
+	if len(flag.Args()) > 0 {
+		if countTmp, err := strconv.Atoi(flag.Arg(0)); err != nil {
+			panic(err)
+		} else {
+			count = countTmp + 1
+		}
+	}
+
 	pageNo := 1
 	pages := make([]*page, 0)
 	waitGroup := sync.WaitGroup{}
 
 	start := time.Now()
-	for ; pageNo < 2; pageNo++ {
+	for ; pageNo < count; pageNo++ {
 		waitGroup.Add(1)
 		go func(pageNo int) {
 			defer waitGroup.Done()
