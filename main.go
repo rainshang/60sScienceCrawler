@@ -2,6 +2,9 @@ package main
 
 import (
 	"fmt"
+	"io"
+	"net/http"
+	"os"
 	"sync"
 	"time"
 
@@ -9,30 +12,38 @@ import (
 	"github.com/gocolly/colly/extensions"
 )
 
+const (
+	downloadDir = "download"
+)
+
 type page struct {
 	no    int
-	items []item
+	items []*item
 }
 
 func createPage(wg *sync.WaitGroup, no int, pageURL string) *page {
 	c := colly.NewCollector()
 	extensions.RandomUserAgent(c)
-	items := make([]item, 0)
+	items := make([]*item, 0)
 
 	// big playing area
 	c.OnHTML(`div[class="podcasts container"]`, func(e *colly.HTMLElement) {
 		item := createItemFromBig(e)
-		items = append(items, *item)
+		items = append(items, item)
 		wg.Add(1)
 		go item.downloadTranscript(wg)
+		wg.Add(1)
+		go item.downloadMP3(wg)
 	})
 
 	// grid item
 	c.OnHTML(`div[class="grid__col large-1-2 xlarge-1-2 medium-1-2 small-no-pad"]`, func(e *colly.HTMLElement) {
 		item := createItemFromGrid(e)
-		items = append(items, *item)
+		items = append(items, item)
 		wg.Add(1)
 		go item.downloadTranscript(wg)
+		wg.Add(1)
+		go item.downloadMP3(wg)
 	})
 
 	c.Visit(pageURL)
@@ -49,8 +60,28 @@ type item struct {
 	urlMp3        string
 }
 
-func (it *item) downloadMp3() {
+func (it *item) checkDir() string {
+	dir := fmt.Sprintf("%s/%s", downloadDir, it.title)
+	if err := os.MkdirAll(dir, os.ModePerm); err != nil {
+		panic(err)
+	}
+	return dir
+}
 
+func (it *item) downloadMP3(wg *sync.WaitGroup) {
+	defer wg.Done()
+	if resp, err := http.Get(it.urlMp3); err != nil {
+		panic(err)
+	} else {
+		defer resp.Body.Close()
+		if file, err := os.Create(fmt.Sprintf("%s/%s.mp3", it.checkDir(), it.title)); err != nil {
+			panic(err)
+		} else {
+			io.Copy(file, resp.Body)
+			file.Sync()
+			file.Close()
+		}
+	}
 }
 
 func (it *item) downloadTranscript(wg *sync.WaitGroup) {
@@ -65,6 +96,14 @@ func (it *item) downloadTranscript(wg *sync.WaitGroup) {
 			content += el.Text + "\n\n"
 		})
 		it.transcript = content
+		// save transcript
+		if file, err := os.Create(fmt.Sprintf("%s/%s.txt", it.checkDir(), it.title)); err != nil {
+			panic(err)
+		} else {
+			file.WriteString(it.transcript)
+			file.Sync()
+			file.Close()
+		}
 	})
 
 	c.Visit(it.urlTranscript)
@@ -94,7 +133,7 @@ func createItemFromGrid(e *colly.HTMLElement) *item {
 
 func main() {
 	pageNo := 1
-	pages := make([]page, 0)
+	pages := make([]*page, 0)
 	waitGroup := sync.WaitGroup{}
 
 	start := time.Now()
@@ -103,15 +142,10 @@ func main() {
 		go func(pageNo int) {
 			defer waitGroup.Done()
 			page := createPage(&waitGroup, pageNo, fmt.Sprintf("https://www.scientificamerican.com/podcast/60-second-science/?page=%d", pageNo))
-			pages = append(pages, *page)
+			pages = append(pages, page)
 		}(pageNo)
 	}
 	waitGroup.Wait()
 	end := time.Now()
-	fmt.Printf("totally used %d s\n", end.Sub(start)/time.Second)
-	for _, page := range pages {
-		for _, item := range page.items {
-			println(item.transcript)
-		}
-	}
+	fmt.Printf("Totally used %d s. Parsed %d pages (%d articles)\n", end.Sub(start)/time.Second, len(pages), len(pages)*len(pages[0].items))
 }
