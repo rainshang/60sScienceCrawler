@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -63,7 +64,7 @@ type item struct {
 }
 
 func (it *item) checkDir() string {
-	dir := fmt.Sprintf("%s/%s", downloadDir, it.title)
+	dir := fmt.Sprintf("%s/%s", downloadDir, fuckWindowFS(it.title))
 	if err := os.MkdirAll(dir, os.ModePerm); err != nil {
 		panic(err)
 	}
@@ -76,7 +77,7 @@ func (it *item) downloadMP3(wg *sync.WaitGroup) {
 		panic(err)
 	} else {
 		defer resp.Body.Close()
-		if file, err := os.Create(fmt.Sprintf("%s/%s.mp3", it.checkDir(), it.title)); err != nil {
+		if file, err := os.Create(fmt.Sprintf("%s/%s.mp3", it.checkDir(), fuckWindowFS(it.title))); err != nil {
 			panic(err)
 		} else {
 			io.Copy(file, resp.Body)
@@ -99,7 +100,7 @@ func (it *item) downloadTranscript(wg *sync.WaitGroup) {
 		})
 		it.transcript = content
 		// save transcript
-		if file, err := os.Create(fmt.Sprintf("%s/%s.txt", it.checkDir(), it.title)); err != nil {
+		if file, err := os.Create(fmt.Sprintf("%s/%s.txt", it.checkDir(), fuckWindowFS(it.title))); err != nil {
 			panic(err)
 		} else {
 			file.WriteString(it.transcript)
@@ -131,6 +132,22 @@ func createItemFromGrid(e *colly.HTMLElement) *item {
 		urlTranscript: transcript,
 		urlMp3:        mp3,
 	}
+}
+
+var replacer = strings.NewReplacer(
+	"<", "＜",
+	">", "＞",
+	":", "：",
+	"\"", "＂",
+	"/", "⁄",
+	"\\", "﹨",
+	"|", "│",
+	"?", "﹖",
+	"*", "﹡",
+)
+
+func fuckWindowFS(s string) string {
+	return replacer.Replace(s)
 }
 
 func main() {
