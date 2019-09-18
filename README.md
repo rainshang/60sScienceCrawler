@@ -10,13 +10,13 @@ My first choice is Python. Well, coincidentally, I'm working on a Go backend. So
 ## Implementation
 I use [Colly](https://github.com/gocolly/colly) for parse and Goroutines for each grids page, full transcript page and audio file downloading.
 ## Example
-##### For Windows 64-bit user
+### For Windows 64-bit user
 Just download it and double-click the `.exe` file. It will download everything into the `download` directory at the same path as the `.exe` file.
 
 ***Advanced opition*** see [For Mac user](#for-mac-user)
 
-##### For Mac user
-Launch `Ternimal` and `cd` the path of the binary file.
+### For Mac user
+Launch `Terminal` and `cd` the path of the binary file.
 
 Execute the executable file directly or with the argument to indicate how many pages you want crawl. The default operation is to crawl the latest page.
 
