@@ -16,7 +16,9 @@ import (
 )
 
 const (
-	downloadDir = "download"
+	downloadDir   = "Scientific America 60s"
+	transcriptDir = downloadDir + "/transcripts"
+	audioDir      = downloadDir + "/audios"
 )
 
 type page struct {
@@ -63,21 +65,13 @@ type item struct {
 	urlMp3        string
 }
 
-func (it *item) checkDir() string {
-	dir := fmt.Sprintf("%s/%s", downloadDir, fuckWindowFS(it.title))
-	if err := os.MkdirAll(dir, os.ModePerm); err != nil {
-		panic(err)
-	}
-	return dir
-}
-
 func (it *item) downloadMP3(wg *sync.WaitGroup) {
 	defer wg.Done()
 	if resp, err := http.Get(it.urlMp3); err != nil {
 		panic(err)
 	} else {
 		defer resp.Body.Close()
-		if file, err := os.Create(fmt.Sprintf("%s/%s.mp3", it.checkDir(), fuckWindowFS(it.title))); err != nil {
+		if file, err := os.Create(fmt.Sprintf("%s/%s.mp3", audioDir, fuckWindowsFS(it.title))); err != nil {
 			panic(err)
 		} else {
 			io.Copy(file, resp.Body)
@@ -100,7 +94,7 @@ func (it *item) downloadTranscript(wg *sync.WaitGroup) {
 		})
 		it.transcript = content
 		// save transcript
-		if file, err := os.Create(fmt.Sprintf("%s/%s.txt", it.checkDir(), fuckWindowFS(it.title))); err != nil {
+		if file, err := os.Create(fmt.Sprintf("%s/%s.txt", transcriptDir, fuckWindowsFS(it.title))); err != nil {
 			panic(err)
 		} else {
 			file.WriteString(it.transcript)
@@ -146,11 +140,21 @@ var replacer = strings.NewReplacer(
 	"*", "﹡",
 )
 
-func fuckWindowFS(s string) string {
+func fuckWindowsFS(s string) string {
 	return replacer.Replace(s)
 }
 
+func checkDownloadDir() {
+	if err := os.MkdirAll(transcriptDir, os.ModePerm); err != nil {
+		panic(err)
+	}
+	if err := os.MkdirAll(audioDir, os.ModePerm); err != nil {
+		panic(err)
+	}
+}
+
 func main() {
+	checkDownloadDir()
 	count := 2
 	flag.Parse()
 	if len(flag.Args()) > 0 {

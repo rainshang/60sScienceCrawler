@@ -23,7 +23,7 @@ Execute the executable file directly or with the argument to indicate how many p
 ![](screenshot/0.png)
 ![](screenshot/1.png)
 ## Download
-I have to spend any piece of time on PTE, so don't have more time to refine it. 
+I don't have too much time to refine it. 
 
 Here is the [v0.1](https://github.com/rainshang/60sScienceCrawler/releases/tag/v0.1) release. Not fancy but workable.
 
